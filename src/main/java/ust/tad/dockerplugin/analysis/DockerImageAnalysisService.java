@@ -188,17 +188,19 @@ public class DockerImageAnalysisService {
      * @param component the component that contains the Docker image to analyze as an artifact.
      * @return the Docker image identifier.
      * @throws MissingDockerImageException if the Component does not contain a Docker image as an
-     *                                     artifact.
+     *                                     artifact or the contained artifact/image name is null.
      */
     private String getImageIdentifierFromComponent(Component component) throws MissingDockerImageException {
-        Optional<Artifact> artifact =
+        Artifact artifact =
                 component.getArtifacts().stream().filter(artifact1 -> artifact1.getType().equals(
-                        "docker_image")).findFirst();
-        if (artifact.isPresent()) {
-            String[] imageNameParts = artifact.get().getName().split(":")[0].split("/");
+                "docker_image")).findFirst().orElseThrow(() -> new MissingDockerImageException(
+                "Component does not contain a Docker Image to analyze."));
+        if (artifact.getName() != null) {
+            String[] imageNameParts = artifact.getName().split(":")[0].split("/");
             return imageNameParts[imageNameParts.length - 1];
         } else {
-            throw new MissingDockerImageException("Component does not contain a Docker Image to " + "analyze.");
+            throw new MissingDockerImageException("Component does not contain a Docker Image with" +
+                    " a valid image name to analyze.");
         }
     }
 }

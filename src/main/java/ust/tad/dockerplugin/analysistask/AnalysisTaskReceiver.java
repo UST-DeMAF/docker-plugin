@@ -2,8 +2,6 @@ package ust.tad.dockerplugin.analysistask;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,9 +10,6 @@ import ust.tad.dockerplugin.analysis.AnalysisService;
 
 @Service
 public class AnalysisTaskReceiver {
-
-  private static final Logger LOG = LoggerFactory.getLogger(AnalysisTaskReceiver.class);
-
   @Autowired private MessageConverter jsonMessageConverter;
 
   @Autowired private AnalysisTaskResponseSender analysisTaskResponseSender;
@@ -51,14 +46,9 @@ public class AnalysisTaskReceiver {
    */
   private void receiveAnalysisTaskStartRequest(Message message) {
     ObjectMapper mapper = new ObjectMapper();
-
     AnalysisTaskStartRequest analysisTaskStartRequest =
         mapper.convertValue(
             jsonMessageConverter.fromMessage(message), AnalysisTaskStartRequest.class);
-
-    LOG.info(
-        String.format(
-            "received AnalysisTaskStartRequest: %s", analysisTaskStartRequest.toString()));
     analysisService.startAnalysis(
         analysisTaskStartRequest.getTaskId(),
         analysisTaskStartRequest.getTransformationProcessId(),
