@@ -33,14 +33,13 @@ public class DockerImageAnalysisTest {
 
     private TechnologyAgnosticDeploymentModel createDummyModel() {
         TechnologyAgnosticDeploymentModel tadm = new TechnologyAgnosticDeploymentModel();
-
         ComponentType baseType = new ComponentType();
         baseType.setName("BaseType");
         tadm.setComponentTypes(new ArrayList<>(List.of(baseType)));
-
         createComponentsWithArtifacts(tadm, List.of("registry/postgres:6.7.8-bla", "minio",
-                "kafka", "reg/registry/postgres:6.7.8-bla", "///mysql", "mongo:456", "random"));
-
+                "minio:2", "kafka", "reg/registry/postgres:6.7.8-bla", "/mysql", "mongo:456", "random",
+                "random", "docker.io/bitnami/mongodb:8.0.4-debian-12-r0", "docker.io/bitnami" +
+                        "/kafka:3.9.0-debian-12-r4"));
         return tadm;
     }
 

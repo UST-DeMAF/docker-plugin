@@ -80,6 +80,11 @@ public class TechnologyAgnosticDeploymentModel {
     return this.componentTypes;
   }
 
+  public ComponentType getComponentTypeById(String componentTypeId) {
+    return this.getComponentTypes().stream().filter(componentType ->
+            componentType.getId().equals(componentTypeId)).findFirst().orElseThrow();
+  }
+
   public void setComponentTypes(List<ComponentType> componentTypes) {
     this.componentTypes = componentTypes;
   }
@@ -239,8 +244,8 @@ public class TechnologyAgnosticDeploymentModel {
                 componentTypes.stream().filter(componentType -> componentType.getName().equals(newComponentType.getName())).findFirst();
         matchedComponentType.ifPresent(componentType -> {
           this.replaceComponentTypeForComponents(newComponentType, componentType);
-          this.addPropertyToComponentTypeIfNotPresent(componentType, newComponentType);
-          this.addOperationToComponentTypeIfNotPresent(componentType, newComponentType);
+          componentType.addPropertiesIfNotPresent(newComponentType);
+          componentType.addOperationsIfNotPresent(newComponentType);
           this.replaceParentTypeForComponentTypes(newComponentType, componentType,
                   newComponentTypes);
           this.replaceParentTypeForComponentTypes(newComponentType, componentType, componentTypes);
@@ -268,44 +273,6 @@ public class TechnologyAgnosticDeploymentModel {
     }
     componentTypes.remove(componentTypeToRemove);
     this.setComponentTypes(componentTypes);
-  }
-
-  /**
-   * Add Properties from another ComponentType to an existing ComponentType if they are not
-   * present.
-   *
-   * @param existingComponentType the ComponentType that Properties are added to.
-   * @param otherComponentType the ComponentType the Properties are added from.
-   */
-  private void addPropertyToComponentTypeIfNotPresent(ComponentType existingComponentType, ComponentType otherComponentType) {
-    List<Property> existingComponentTypeProperties = existingComponentType.getProperties();
-    List<String> propertyKeys =
-            existingComponentType.getProperties().stream().map(Property::getKey).collect(Collectors.toList());
-    for (Property property: otherComponentType.getProperties()) {
-      if (!propertyKeys.contains(property.getKey())) {
-        existingComponentTypeProperties.add(property);
-        existingComponentType.setProperties(existingComponentTypeProperties);
-      }
-    }
-  }
-
-  /**
-   * Add Operations from another ComponentType to an existing ComponentType if they are not
-   * present.
-   *
-   * @param existingComponentType the ComponentType that Operations are added to.
-   * @param otherComponentType the ComponentType the Operations are added from.
-   */
-  private void addOperationToComponentTypeIfNotPresent(ComponentType existingComponentType, ComponentType otherComponentType) {
-    List<Operation> existingComponentTypeOperations = existingComponentType.getOperations();
-    List<String> operationNames =
-            existingComponentType.getOperations().stream().map(Operation::getName).collect(Collectors.toList());
-    for (Operation operation: otherComponentType.getOperations()) {
-      if (!operationNames.contains(operation.getName())) {
-        existingComponentTypeOperations.add(operation);
-        existingComponentType.setOperations(existingComponentTypeOperations);
-      }
-    }
   }
 
   /**

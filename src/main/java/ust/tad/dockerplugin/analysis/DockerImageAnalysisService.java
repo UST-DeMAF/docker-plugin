@@ -42,11 +42,11 @@ public class DockerImageAnalysisService {
             MissingDockerImageException, MissingBaseTypeException {
         String imageIdentifier = getImageIdentifierFromComponent(componentToAnalyze);
         if (databaseImageIdentifiers.contains(imageIdentifier)) {
-            transformComponentWithDatabaseImage(componentToAnalyze, tadm);
+            transformComponentWithDatabaseImage(componentToAnalyze, tadm, imageIdentifier);
         } else if (messageBrokerImageIdentifiers.contains(imageIdentifier)) {
-            transformComponentWithMessageBrokerImage(componentToAnalyze, tadm);
+            transformComponentWithMessageBrokerImage(componentToAnalyze, tadm, imageIdentifier);
         } else {
-            transformComponentWithoutImageClassification(componentToAnalyze, tadm);
+            transformComponentWithoutImageClassification(componentToAnalyze, tadm, imageIdentifier);
         }
         return tadm;
     }
@@ -57,15 +57,15 @@ public class DockerImageAnalysisService {
      *
      * @param componentToAnalyze the component with the Docker image.
      * @param tadm               the tadm to update with the transformation changes.
+     * @param imageIdentifier    the Docker image identifier.
      * @throws MissingBaseTypeException if the tadm does not contain a component type 'BaseType'.
      */
     private void transformComponentWithDatabaseImage(
-            Component componentToAnalyze, TechnologyAgnosticDeploymentModel tadm)
+            Component componentToAnalyze, TechnologyAgnosticDeploymentModel tadm,
+            String imageIdentifier)
             throws MissingBaseTypeException {
         ComponentType databaseSystemType = getOrCreateDatabaseSystemType(tadm);
-        ComponentType oldComponentType = componentToAnalyze.getType();
-        componentToAnalyze.setType(databaseSystemType);
-        tadm.removeComponentTypeIfUnused(oldComponentType);
+        setComponentSpecificType(componentToAnalyze, databaseSystemType, tadm, imageIdentifier);
     }
 
     /**
@@ -97,15 +97,15 @@ public class DockerImageAnalysisService {
      *
      * @param componentToAnalyze the component with the Docker image.
      * @param tadm               the tadm to update with the transformation changes.
+     * @param imageIdentifier    the Docker image identifier.
      * @throws MissingBaseTypeException if the tadm does not contain a component type 'BaseType'.
      */
     private void transformComponentWithMessageBrokerImage(
-            Component componentToAnalyze, TechnologyAgnosticDeploymentModel tadm)
+            Component componentToAnalyze, TechnologyAgnosticDeploymentModel tadm,
+            String imageIdentifier)
             throws MissingBaseTypeException {
         ComponentType messageBrokerType = getOrCreateMessageBrokerType(tadm);
-        ComponentType oldComponentType = componentToAnalyze.getType();
-        componentToAnalyze.setType(messageBrokerType);
-        tadm.removeComponentTypeIfUnused(oldComponentType);
+        setComponentSpecificType(componentToAnalyze, messageBrokerType, tadm, imageIdentifier);
     }
 
     /**
@@ -134,19 +134,20 @@ public class DockerImageAnalysisService {
     /**
      * Transform a Component that contains a Docker image that could not be further classified and
      * persist the changes in the given tadm. In this case, the generic 'Software Application'
-     * component type is assigned to the component.
+     * component type is assigned.
      *
      * @param componentToAnalyze the component with the Docker image.
      * @param tadm               the tadm to update with the transformation changes.
+     * @param imageIdentifier    the Docker image identifier.
      * @throws MissingBaseTypeException if the tadm does not contain a component type 'BaseType'.
      */
     private void transformComponentWithoutImageClassification(
-            Component componentToAnalyze, TechnologyAgnosticDeploymentModel tadm)
+            Component componentToAnalyze, TechnologyAgnosticDeploymentModel tadm,
+            String imageIdentifier)
             throws MissingBaseTypeException {
         ComponentType softwareApplicationType = getOrCreateSoftwareApplicationType(tadm);
-        ComponentType oldComponentType = componentToAnalyze.getType();
-        componentToAnalyze.setType(softwareApplicationType);
-        tadm.removeComponentTypeIfUnused(oldComponentType);
+        setComponentSpecificType(componentToAnalyze, softwareApplicationType,
+                tadm, imageIdentifier);
     }
 
     /**
@@ -193,14 +194,47 @@ public class DockerImageAnalysisService {
     private String getImageIdentifierFromComponent(Component component) throws MissingDockerImageException {
         Artifact artifact =
                 component.getArtifacts().stream().filter(artifact1 -> artifact1.getType().equals(
-                "docker_image")).findFirst().orElseThrow(() -> new MissingDockerImageException(
-                "Component does not contain a Docker Image to analyze."));
+                        "docker_image")).findFirst().orElseThrow(() -> new MissingDockerImageException(
+                        "Component does not contain a Docker Image to analyze."));
         if (artifact.getName() != null) {
             String[] imageNameParts = artifact.getName().split(":")[0].split("/");
             return imageNameParts[imageNameParts.length - 1];
         } else {
             throw new MissingDockerImageException("Component does not contain a Docker Image with" +
                     " a valid image name to analyze.");
+        }
+    }
+
+    /**
+     * For an analyzed component, rename the component type to fit the naming scheme of
+     * [image identifier]-[classified parent component type].
+     * If a component type with this naming scheme already exists, then merge into one shared
+     * component type.
+     *
+     * @param component            the analyzed component.
+     * @param classifiedParentType the parent type classified for this component.
+     * @param tadm                 the tadm to update with the transformation changes.
+     * @param imageIdentifier      the Docker image identifier.
+     */
+    private void setComponentSpecificType(Component component,
+                                          ComponentType classifiedParentType,
+                                          TechnologyAgnosticDeploymentModel tadm,
+                                          String imageIdentifier) {
+        String componentTypeNewName = imageIdentifier + "-" + classifiedParentType.getName();
+        ComponentType oldComponentType = tadm.getComponentTypeById(component.getType().getId());
+        if (tadm.getComponentTypes().stream().noneMatch(componentType ->
+                componentType.getName().equals(componentTypeNewName))) {
+            oldComponentType.setName(componentTypeNewName);
+            oldComponentType.setParentType(classifiedParentType);
+            component.setType(oldComponentType);
+        } else {
+            ComponentType existingComponentType =
+                    tadm.getComponentTypes().stream().filter(componentType ->
+                            componentType.getName().equals(componentTypeNewName)).findFirst().orElseThrow();
+            existingComponentType.addPropertiesIfNotPresent(oldComponentType);
+            existingComponentType.addOperationsIfNotPresent(oldComponentType);
+            component.setType(existingComponentType);
+            tadm.removeComponentTypeIfUnused(oldComponentType);
         }
     }
 }
