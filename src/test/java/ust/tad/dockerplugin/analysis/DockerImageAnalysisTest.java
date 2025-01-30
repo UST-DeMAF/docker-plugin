@@ -11,6 +11,7 @@ import ust.tad.dockerplugin.models.tadm.Component;
 import ust.tad.dockerplugin.models.tadm.ComponentType;
 import ust.tad.dockerplugin.models.tadm.TechnologyAgnosticDeploymentModel;
 
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,11 +21,13 @@ public class DockerImageAnalysisTest {
     @Autowired private ComponentTypeProvider componentTypeProvider;
 
     @Test
-    public void testAnalysisSuccessful() throws MissingBaseTypeException, MissingDockerImageException {
+    public void testAnalysisSuccessful() throws MissingBaseTypeException,
+            MissingDockerImageException, URISyntaxException {
         TechnologyAgnosticDeploymentModel tadm = createDummyModel();
         System.out.println("Transformation input: " + tadm);
-        for (Component componentToAnalyze: tadm.getComponents()) {
-            tadm = dockerImageAnalysisService.analyzeDockerImageOfComponent(componentToAnalyze, tadm);
+        for (Component componentToAnalyze : tadm.getComponents()) {
+            tadm = dockerImageAnalysisService.analyzeDockerImageOfComponent(componentToAnalyze,
+                    tadm);
         }
         TechnologyAgnosticDeploymentModel expectedTADM = createExpectedTransformationResult();
         System.out.println("Transformation result: " + tadm);
@@ -85,5 +88,4 @@ public class DockerImageAnalysisTest {
             tadm.addComponents(new ArrayList<>(List.of(dummyComponent)));
         }
     }
-
 }

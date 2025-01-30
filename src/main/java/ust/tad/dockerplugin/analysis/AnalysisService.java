@@ -11,6 +11,7 @@ import ust.tad.dockerplugin.models.ModelsService;
 import ust.tad.dockerplugin.models.tadm.Component;
 import ust.tad.dockerplugin.models.tadm.TechnologyAgnosticDeploymentModel;
 
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -78,7 +79,7 @@ public class AnalysisService {
           try {
             this.tadm =
                     dockerImageAnalysisService.analyzeDockerImageOfComponent(component, tadm);
-          } catch (MissingDockerImageException | MissingBaseTypeException ignored) {
+          } catch (MissingDockerImageException | MissingBaseTypeException | URISyntaxException ignored) {
           }
         });
       }

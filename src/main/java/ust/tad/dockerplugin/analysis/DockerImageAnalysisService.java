@@ -1,5 +1,6 @@
 package ust.tad.dockerplugin.analysis;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,8 @@ import ust.tad.dockerplugin.models.tadm.Component;
 import ust.tad.dockerplugin.models.tadm.ComponentType;
 import ust.tad.dockerplugin.models.tadm.TechnologyAgnosticDeploymentModel;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,7 +42,7 @@ public class DockerImageAnalysisService {
      */
     public TechnologyAgnosticDeploymentModel analyzeDockerImageOfComponent(
             Component componentToAnalyze, TechnologyAgnosticDeploymentModel tadm) throws
-            MissingDockerImageException, MissingBaseTypeException {
+            MissingDockerImageException, MissingBaseTypeException, URISyntaxException {
         String imageIdentifier = getImageIdentifierFromComponent(componentToAnalyze);
         if (databaseImageIdentifiers.contains(imageIdentifier)) {
             transformComponentWithDatabaseImage(componentToAnalyze, tadm, imageIdentifier);
@@ -63,9 +66,10 @@ public class DockerImageAnalysisService {
     private void transformComponentWithDatabaseImage(
             Component componentToAnalyze, TechnologyAgnosticDeploymentModel tadm,
             String imageIdentifier)
-            throws MissingBaseTypeException {
+            throws MissingBaseTypeException, URISyntaxException, MissingDockerImageException {
         ComponentType databaseSystemType = getOrCreateDatabaseSystemType(tadm);
         setComponentSpecificType(componentToAnalyze, databaseSystemType, tadm, imageIdentifier);
+        setFileURIOfDockerImageArtifact(componentToAnalyze);
     }
 
     /**
@@ -103,9 +107,10 @@ public class DockerImageAnalysisService {
     private void transformComponentWithMessageBrokerImage(
             Component componentToAnalyze, TechnologyAgnosticDeploymentModel tadm,
             String imageIdentifier)
-            throws MissingBaseTypeException {
+            throws MissingBaseTypeException, URISyntaxException, MissingDockerImageException {
         ComponentType messageBrokerType = getOrCreateMessageBrokerType(tadm);
         setComponentSpecificType(componentToAnalyze, messageBrokerType, tadm, imageIdentifier);
+        setFileURIOfDockerImageArtifact(componentToAnalyze);
     }
 
     /**
@@ -144,10 +149,11 @@ public class DockerImageAnalysisService {
     private void transformComponentWithoutImageClassification(
             Component componentToAnalyze, TechnologyAgnosticDeploymentModel tadm,
             String imageIdentifier)
-            throws MissingBaseTypeException {
+            throws MissingBaseTypeException, URISyntaxException, MissingDockerImageException {
         ComponentType softwareApplicationType = getOrCreateSoftwareApplicationType(tadm);
         setComponentSpecificType(componentToAnalyze, softwareApplicationType,
                 tadm, imageIdentifier);
+        setFileURIOfDockerImageArtifact(componentToAnalyze);
     }
 
     /**
@@ -192,16 +198,66 @@ public class DockerImageAnalysisService {
      *                                     artifact or the contained artifact/image name is null.
      */
     private String getImageIdentifierFromComponent(Component component) throws MissingDockerImageException {
-        Artifact artifact =
-                component.getArtifacts().stream().filter(artifact1 -> artifact1.getType().equals(
-                        "docker_image")).findFirst().orElseThrow(() -> new MissingDockerImageException(
-                        "Component does not contain a Docker Image to analyze."));
+        Artifact artifact = getDockerImageArtifactFromComponent(component);
         if (artifact.getName() != null) {
-            String[] imageNameParts = artifact.getName().split(":")[0].split("/");
-            return imageNameParts[imageNameParts.length - 1];
+            String[] imageNameParts = artifact.getName().split("/");
+            return imageNameParts[imageNameParts.length - 1].split(":")[0];
         } else {
             throw new MissingDockerImageException("Component does not contain a Docker Image with" +
                     " a valid image name to analyze.");
+        }
+    }
+
+    /**
+     * Get an Artifact named "docker_image" from the given Component.
+     *
+     * @param component the Component from which to get the Artifact.
+     * @return the Docker image Artifact.
+     * @throws MissingDockerImageException if the Component does not contain a Docker image as an
+     *                                     artifact or the contained artifact/image name is null.
+     */
+    private Artifact getDockerImageArtifactFromComponent(Component component) throws MissingDockerImageException {
+        return component.getArtifacts().stream().filter(artifact1 -> artifact1.getType().equals(
+                "docker_image")).findFirst().orElseThrow(() -> new MissingDockerImageException(
+                "Component does not contain a Docker Image to analyze."));
+    }
+
+    /**
+     * Set the fileURI field of a docker image Artifact of a given Component.
+     * Analyzes the name of the docker image and constructs the fileURI from this.
+     * The structure of the docker image name is defined here:
+     * <a href="https://docs.docker.com/reference/cli/docker/image/tag/">...</a>
+     * If the image name defines a registry, set the fileURI from the name.
+     * If not, Docker defaults to the Dockerhub image registry.
+     *
+     * @param component the Component that contains the Docker image Artifact to set the fileURI.
+     * @throws MissingDockerImageException if the Component does not contain a Docker image as an
+     *                                     artifact or the contained artifact/image name is null.
+     * @throws URISyntaxException          if the constructed fileURI string cannot be parsed
+     * into a URI.
+     */
+    private void setFileURIOfDockerImageArtifact(Component component) throws MissingDockerImageException, URISyntaxException {
+        Artifact artifact = getDockerImageArtifactFromComponent(component);
+        if (artifact.getName() == null) {
+            throw new MissingDockerImageException("Component does not contain a Docker Image with" +
+                    " a valid image name to analyze.");
+        } else if (artifact.getFileURI() == null || artifact.getFileURI().toString().equals("-")) {
+            List<Artifact> artifacts = component.getArtifacts();
+            artifacts.remove(artifact);
+            String[] imageNameParts = artifact.getName().split("/");
+            String imageNameWithoutTag = StringUtils.substringBeforeLast(artifact.getName(), ":");
+            if (imageNameParts.length == 1) {
+                artifact.setFileURI(new URI("https://hub.docker.com/_/" + imageNameWithoutTag));
+            } else if (imageNameParts[0].equals("docker.io")) {
+                artifact.setFileURI(new URI("https://hub.docker.com/r/" +
+                        imageNameWithoutTag.replaceFirst("docker.io/", "")));
+            } else if (imageNameParts[0].matches(".*[\\.:].*")) {
+                artifact.setFileURI(new URI(artifact.getName()));
+            } else {
+                artifact.setFileURI(new URI("https://hub.docker.com/r/" + imageNameWithoutTag));
+            }
+            artifacts.add(artifact);
+            component.setArtifacts(artifacts);
         }
     }
 
