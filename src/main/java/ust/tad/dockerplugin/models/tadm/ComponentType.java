@@ -1,8 +1,8 @@
 package ust.tad.dockerplugin.models.tadm;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class ComponentType extends ModelElementType {
 
@@ -78,5 +78,41 @@ public class ComponentType extends ModelElementType {
         + getOperations()
         + "'"
         + "}";
+  }
+
+  /**
+   * Add Properties from another ComponentType to this ComponentType if they are not
+   * present.
+   *
+   * @param otherComponentType the ComponentType the Properties are added from.
+   */
+  public void addPropertiesIfNotPresent(ComponentType otherComponentType) {
+    List<Property> existingComponentTypeProperties = this.getProperties();
+    List<String> propertyKeys =
+            this.getProperties().stream().map(Property::getKey).collect(Collectors.toList());
+    for (Property property: otherComponentType.getProperties()) {
+      if (!propertyKeys.contains(property.getKey())) {
+        existingComponentTypeProperties.add(property);
+        this.setProperties(existingComponentTypeProperties);
+      }
+    }
+  }
+
+  /**
+   * Add Operations from another ComponentType to this ComponentType if they are not
+   * present.
+   *
+   * @param otherComponentType the ComponentType the Operations are added from.
+   */
+  public void addOperationsIfNotPresent(ComponentType otherComponentType) {
+    List<Operation> existingComponentTypeOperations = this.getOperations();
+    List<String> operationNames =
+            this.getOperations().stream().map(Operation::getName).collect(Collectors.toList());
+    for (Operation operation: otherComponentType.getOperations()) {
+      if (!operationNames.contains(operation.getName())) {
+        existingComponentTypeOperations.add(operation);
+        this.setOperations(existingComponentTypeOperations);
+      }
+    }
   }
 }

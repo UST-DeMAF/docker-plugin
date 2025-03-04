@@ -11,6 +11,7 @@ import ust.tad.dockerplugin.models.tadm.Component;
 import ust.tad.dockerplugin.models.tadm.ComponentType;
 import ust.tad.dockerplugin.models.tadm.TechnologyAgnosticDeploymentModel;
 
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,11 +21,13 @@ public class DockerImageAnalysisTest {
     @Autowired private ComponentTypeProvider componentTypeProvider;
 
     @Test
-    public void testAnalysisSuccessful() throws MissingBaseTypeException, MissingDockerImageException {
+    public void testAnalysisSuccessful() throws MissingBaseTypeException,
+            MissingDockerImageException, URISyntaxException {
         TechnologyAgnosticDeploymentModel tadm = createDummyModel();
         System.out.println("Transformation input: " + tadm);
-        for (Component componentToAnalyze: tadm.getComponents()) {
-            tadm = dockerImageAnalysisService.analyzeDockerImageOfComponent(componentToAnalyze, tadm);
+        for (Component componentToAnalyze : tadm.getComponents()) {
+            tadm = dockerImageAnalysisService.analyzeDockerImageOfComponent(componentToAnalyze,
+                    tadm);
         }
         TechnologyAgnosticDeploymentModel expectedTADM = createExpectedTransformationResult();
         System.out.println("Transformation result: " + tadm);
@@ -33,14 +36,13 @@ public class DockerImageAnalysisTest {
 
     private TechnologyAgnosticDeploymentModel createDummyModel() {
         TechnologyAgnosticDeploymentModel tadm = new TechnologyAgnosticDeploymentModel();
-
         ComponentType baseType = new ComponentType();
         baseType.setName("BaseType");
         tadm.setComponentTypes(new ArrayList<>(List.of(baseType)));
-
         createComponentsWithArtifacts(tadm, List.of("registry/postgres:6.7.8-bla", "minio",
-                "kafka", "reg/registry/postgres:6.7.8-bla", "///mysql", "mongo:456", "random"));
-
+                "minio:2", "kafka", "reg/registry/postgres:6.7.8-bla", "/mysql", "mongo:456", "random",
+                "random", "docker.io/bitnami/mongodb:8.0.4-debian-12-r0", "docker.io/bitnami" +
+                        "/kafka:3.9.0-debian-12-r4"));
         return tadm;
     }
 
@@ -86,5 +88,4 @@ public class DockerImageAnalysisTest {
             tadm.addComponents(new ArrayList<>(List.of(dummyComponent)));
         }
     }
-
 }
