@@ -266,6 +266,7 @@ public class DockerImageAnalysisService {
      * [image identifier]-[classified parent component type].
      * If a component type with this naming scheme already exists, then merge into one shared
      * component type.
+     * If the old component type is used by other components, create a new component type.
      *
      * @param component            the analyzed component.
      * @param classifiedParentType the parent type classified for this component.
@@ -278,12 +279,8 @@ public class DockerImageAnalysisService {
                                           String imageIdentifier) {
         String componentTypeNewName = imageIdentifier + "-" + classifiedParentType.getName();
         ComponentType oldComponentType = tadm.getComponentTypeById(component.getType().getId());
-        if (tadm.getComponentTypes().stream().noneMatch(componentType ->
+        if (tadm.getComponentTypes().stream().anyMatch(componentType ->
                 componentType.getName().equals(componentTypeNewName))) {
-            oldComponentType.setName(componentTypeNewName);
-            oldComponentType.setParentType(classifiedParentType);
-            component.setType(oldComponentType);
-        } else {
             ComponentType existingComponentType =
                     tadm.getComponentTypes().stream().filter(componentType ->
                             componentType.getName().equals(componentTypeNewName)).findFirst().orElseThrow();
@@ -291,6 +288,19 @@ public class DockerImageAnalysisService {
             existingComponentType.addOperationsIfNotPresent(oldComponentType);
             component.setType(existingComponentType);
             tadm.removeComponentTypeIfUnused(oldComponentType);
+        } else if (tadm.getComponents().stream().filter(componentToTest ->
+                componentToTest.getType().equals(oldComponentType)).count() > 1) {
+            ComponentType newComponentType = new ComponentType();
+            newComponentType.setName(componentTypeNewName);
+            newComponentType.setParentType(classifiedParentType);
+            newComponentType.setProperties(oldComponentType.getProperties());
+            newComponentType.setOperations(oldComponentType.getOperations());
+            tadm.addComponentTypes(List.of(newComponentType));
+            component.setType(newComponentType);
+        } else {
+            oldComponentType.setName(componentTypeNewName);
+            oldComponentType.setParentType(classifiedParentType);
+            component.setType(oldComponentType);
         }
     }
 }
