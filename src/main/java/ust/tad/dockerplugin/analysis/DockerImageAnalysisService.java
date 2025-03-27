@@ -16,6 +16,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class DockerImageAnalysisService {
@@ -234,7 +235,7 @@ public class DockerImageAnalysisService {
      * @throws MissingDockerImageException if the Component does not contain a Docker image as an
      *                                     artifact or the contained artifact/image name is null.
      * @throws URISyntaxException          if the constructed fileURI string cannot be parsed
-     * into a URI.
+     *                                     into a URI.
      */
     private void setFileURIOfDockerImageArtifact(Component component) throws MissingDockerImageException, URISyntaxException {
         Artifact artifact = getDockerImageArtifactFromComponent(component);
@@ -293,13 +294,14 @@ public class DockerImageAnalysisService {
             ComponentType newComponentType = new ComponentType();
             newComponentType.setName(componentTypeNewName);
             newComponentType.setParentType(classifiedParentType);
-            newComponentType.setProperties(oldComponentType.getProperties());
+            newComponentType.setProperties(component.getProperties());
             newComponentType.setOperations(oldComponentType.getOperations());
             tadm.addComponentTypes(List.of(newComponentType));
             component.setType(newComponentType);
         } else {
             oldComponentType.setName(componentTypeNewName);
             oldComponentType.setParentType(classifiedParentType);
+            oldComponentType.setProperties(component.getProperties());
             component.setType(oldComponentType);
         }
     }
