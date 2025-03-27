@@ -70,7 +70,7 @@ public class DockerImageAnalysisService {
             throws MissingBaseTypeException, URISyntaxException, MissingDockerImageException {
         ComponentType databaseSystemType = getOrCreateDatabaseSystemType(tadm);
         setComponentSpecificType(componentToAnalyze, databaseSystemType, tadm, imageIdentifier);
-        setFileURIOfDockerImageArtifact(componentToAnalyze);
+        setFileURIOfDockerImageArtifacts(componentToAnalyze);
     }
 
     /**
@@ -111,7 +111,7 @@ public class DockerImageAnalysisService {
             throws MissingBaseTypeException, URISyntaxException, MissingDockerImageException {
         ComponentType messageBrokerType = getOrCreateMessageBrokerType(tadm);
         setComponentSpecificType(componentToAnalyze, messageBrokerType, tadm, imageIdentifier);
-        setFileURIOfDockerImageArtifact(componentToAnalyze);
+        setFileURIOfDockerImageArtifacts(componentToAnalyze);
     }
 
     /**
@@ -154,7 +154,7 @@ public class DockerImageAnalysisService {
         ComponentType softwareApplicationType = getOrCreateSoftwareApplicationType(tadm);
         setComponentSpecificType(componentToAnalyze, softwareApplicationType,
                 tadm, imageIdentifier);
-        setFileURIOfDockerImageArtifact(componentToAnalyze);
+        setFileURIOfDockerImageArtifacts(componentToAnalyze);
     }
 
     /**
@@ -224,27 +224,56 @@ public class DockerImageAnalysisService {
     }
 
     /**
-     * Set the fileURI field of a docker image Artifact of a given Component.
+     * Set the fileURI field of all docker image artifacts of a component or the components operations.
+     *
+     * @param component the component for which to set the fileURI.
+     * @throws URISyntaxException if the constructed fileURI string cannot be parsed into a URI.
+     * @throws MissingDockerImageException if the contained artifact/image name is null.
+     */
+    private void setFileURIOfDockerImageArtifacts(Component component) throws URISyntaxException,
+            MissingDockerImageException {
+        List<Artifact> artifacts = getDockerImageArtifactsFromComponent(component);
+        for (Artifact artifact: artifacts) {
+            setFileURIOfDockerImageArtifact(artifact);
+        }
+    }
+
+    /**
+     * Get the docker image artifacts of a component either directly contained in the component or
+     * contained in the components operations.
+     *
+     * @param component the component from which to get the artifacts.
+     * @return the list of artifacts.
+     */
+    private List<Artifact> getDockerImageArtifactsFromComponent(Component component) {
+        List<Artifact> artifacts =
+                component.getArtifacts().stream().filter(artifact1 -> artifact1.getType().equals(
+                        "docker_image")).collect(Collectors.toList());
+        artifacts.addAll(component.getOperations().stream().flatMap(
+                operation -> operation.getArtifacts().stream().filter(
+                        artifact -> artifact.getType().equals("docker_image"))).collect(Collectors.toList()));
+        return artifacts;
+    }
+
+    /**
+     * Set the fileURI field of a docker image Artifact.
      * Analyzes the name of the docker image and constructs the fileURI from this.
      * The structure of the docker image name is defined here:
      * <a href="https://docs.docker.com/reference/cli/docker/image/tag/">...</a>
      * If the image name defines a registry, set the fileURI from the name.
      * If not, Docker defaults to the Dockerhub image registry.
      *
-     * @param component the Component that contains the Docker image Artifact to set the fileURI.
-     * @throws MissingDockerImageException if the Component does not contain a Docker image as an
-     *                                     artifact or the contained artifact/image name is null.
+     * @param artifact the Artifact to set the fileURI.
+     * @throws MissingDockerImageException if the contained artifact/image name is null.
      * @throws URISyntaxException          if the constructed fileURI string cannot be parsed
      *                                     into a URI.
      */
-    private void setFileURIOfDockerImageArtifact(Component component) throws MissingDockerImageException, URISyntaxException {
-        Artifact artifact = getDockerImageArtifactFromComponent(component);
+    private void setFileURIOfDockerImageArtifact(Artifact artifact)
+            throws MissingDockerImageException, URISyntaxException {
         if (artifact.getName() == null) {
             throw new MissingDockerImageException("Component does not contain a Docker Image with" +
                     " a valid image name to analyze.");
         } else if (artifact.getFileURI() == null || artifact.getFileURI().toString().equals("-")) {
-            List<Artifact> artifacts = component.getArtifacts();
-            artifacts.remove(artifact);
             String[] imageNameParts = artifact.getName().split("/");
             String imageNameWithoutTag = StringUtils.substringBeforeLast(artifact.getName(), ":");
             if (imageNameParts.length == 1) {
@@ -257,8 +286,6 @@ public class DockerImageAnalysisService {
             } else {
                 artifact.setFileURI(new URI("https://hub.docker.com/r/" + imageNameWithoutTag));
             }
-            artifacts.add(artifact);
-            component.setArtifacts(artifacts);
         }
     }
 
