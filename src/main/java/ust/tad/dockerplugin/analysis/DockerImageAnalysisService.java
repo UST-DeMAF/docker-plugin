@@ -7,13 +7,11 @@ import org.springframework.stereotype.Service;
 import ust.tad.dockerplugin.analysis.util.ComponentTypeProvider;
 import ust.tad.dockerplugin.analysis.util.MissingBaseTypeException;
 import ust.tad.dockerplugin.analysis.util.MissingDockerImageException;
-import ust.tad.dockerplugin.models.tadm.Artifact;
-import ust.tad.dockerplugin.models.tadm.Component;
-import ust.tad.dockerplugin.models.tadm.ComponentType;
-import ust.tad.dockerplugin.models.tadm.TechnologyAgnosticDeploymentModel;
+import ust.tad.dockerplugin.models.tadm.*;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -321,14 +319,14 @@ public class DockerImageAnalysisService {
             ComponentType newComponentType = new ComponentType();
             newComponentType.setName(componentTypeNewName);
             newComponentType.setParentType(classifiedParentType);
-            newComponentType.setProperties(component.getProperties());
+            newComponentType.setProperties(new ArrayList<>(component.getProperties()));
             newComponentType.setOperations(oldComponentType.getOperations());
             tadm.addComponentTypes(List.of(newComponentType));
             component.setType(newComponentType);
         } else {
             oldComponentType.setName(componentTypeNewName);
             oldComponentType.setParentType(classifiedParentType);
-            oldComponentType.setProperties(component.getProperties());
+            oldComponentType.setProperties(new ArrayList<>(component.getProperties()));
             component.setType(oldComponentType);
         }
     }
