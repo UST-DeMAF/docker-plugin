@@ -11,13 +11,9 @@ COPY src ./src
 # Build the project, using multiple threads and skipping tests
 RUN mvn -T 2C -q clean package -DskipTests
 
-# Stage 2: Create a minimal runtime image using OpenJDK 11 JRE
-FROM openjdk:11-jre-slim
-
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y curl \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# Stage 2: Create a minimal runtime image using the Eclipse Temurin 11 JRE
+# The image already contains curl
+FROM eclipse-temurin:11-jre
 
 # Set the working directory for the runtime stage
 WORKDIR /app
